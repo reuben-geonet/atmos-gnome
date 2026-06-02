@@ -27,7 +27,7 @@ jobs:
       - name: Pack extension
         run: |
           mkdir -p dist
-          gnome-extensions pack --force --out-dir dist extension/atmos-toggle@reubena.local
+          gnome-extensions pack --force --out-dir dist extension/atmos-vpn@reuben-geonet.github.io
 
       - name: Upload extension artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02

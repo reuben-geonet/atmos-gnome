@@ -1,4 +1,4 @@
-UUID := atmos-toggle@reubena.local
+UUID := atmos-vpn@reuben-geonet.github.io
 EXTENSION_DIR := extension/$(UUID)
 INSTALLED_DIR := $(HOME)/.local/share/gnome-shell/extensions/$(UUID)
 ZIP := $(UUID).shell-extension.zip

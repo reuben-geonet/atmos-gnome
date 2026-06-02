@@ -6,10 +6,10 @@ and provides the `atmosctl` binary.
 
 ## Key Files
 
-- `extension/atmos-toggle@reubena.local/extension.js`: GNOME Shell 50 Quick
+- `extension/atmos-vpn@reuben-geonet.github.io/extension.js`: GNOME Shell 50 Quick
   Settings tile.
-- `extension/atmos-toggle@reubena.local/prefs.js`: preferences UI.
-- `extension/atmos-toggle@reubena.local/metadata.json`: extension metadata.
+- `extension/atmos-vpn@reuben-geonet.github.io/prefs.js`: preferences UI.
+- `extension/atmos-vpn@reuben-geonet.github.io/metadata.json`: extension metadata.
 - `.github/workflows/ci.yml`: package and Shexli static-analysis workflow.
 - `.github/workflows/ego-upload.yml`: release-triggered extensions.gnome.org
   upload workflow.

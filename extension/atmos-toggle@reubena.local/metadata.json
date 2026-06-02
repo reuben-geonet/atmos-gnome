@@ -1,9 +1,0 @@
-{
-  "uuid": "atmos-toggle@reubena.local",
-  "name": "Atmos Toggle",
-  "description": "Quick Settings toggle for Atmos Agent pause and resume.",
-  "shell-version": ["50"],
-  "url": "https://github.com/reuben-geonet/atmos-gnome",
-  "version": 1,
-  "version-name": "0.1.0"
-}

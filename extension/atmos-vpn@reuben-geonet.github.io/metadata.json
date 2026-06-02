@@ -1,0 +1,9 @@
+{
+  "uuid": "atmos-vpn@reuben-geonet.github.io",
+  "name": "Atmos VPN",
+  "description": "Quick Settings toggle for Atmos Agent VPN pause and resume.",
+  "shell-version": ["50"],
+  "url": "https://github.com/reuben-geonet/atmos-gnome",
+  "version": 1,
+  "version-name": "0.1.0"
+}

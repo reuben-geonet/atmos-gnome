@@ -66,7 +66,7 @@ class AtmosToggle extends QuickToggle {
             this._sync();
             return GLib.SOURCE_CONTINUE;
         });
-        GLib.Source.set_name_by_id(this._pollId, '[atmos-toggle] status poll');
+        GLib.Source.set_name_by_id(this._pollId, '[atmos-vpn] status poll');
     }
 
     _destroy() {
@@ -115,7 +115,7 @@ class AtmosToggle extends QuickToggle {
             this._sync();
             return GLib.SOURCE_REMOVE;
         });
-        GLib.Source.set_name_by_id(this._resyncId, '[atmos-toggle] resync');
+        GLib.Source.set_name_by_id(this._resyncId, '[atmos-vpn] resync');
     }
 
     _sync() {
