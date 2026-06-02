@@ -6,6 +6,8 @@ import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const HELPER_NAME = 'atmosctl';
+const MIN_HELPER_VERSION = [0, 2, 0];
+const MIN_HELPER_VERSION_NAME = '0.2.0';
 const INSTALL_URL = 'https://github.com/reuben-geonet/atmos-cli';
 
 function findAtmosctl() {
@@ -26,6 +28,32 @@ function findAtmosctl() {
     }
 
     return null;
+}
+
+function parseHelperVersion(version) {
+    if (typeof version !== 'string')
+        return null;
+
+    const match = version.match(/^(\d+)\.(\d+)\.(\d+)/);
+    if (!match)
+        return null;
+
+    return match.slice(1).map(part => Number(part));
+}
+
+function helperVersionSupported(version) {
+    const parsed = parseHelperVersion(version);
+    if (!parsed)
+        return false;
+
+    for (let i = 0; i < MIN_HELPER_VERSION.length; i++) {
+        if (parsed[i] > MIN_HELPER_VERSION[i])
+            return true;
+        if (parsed[i] < MIN_HELPER_VERSION[i])
+            return false;
+    }
+
+    return true;
 }
 
 export default class AtmosPreferences extends ExtensionPreferences {
@@ -75,9 +103,10 @@ export default class AtmosPreferences extends ExtensionPreferences {
         const startupGroup = new Adw.PreferencesGroup({
             title: 'Startup',
         });
+        startupGroup.visible = false;
 
         const startupRow = new Adw.ActionRow({
-            title: 'Start at login without window',
+            title: 'Open GUI at login',
             subtitle: 'Checking',
         });
 
@@ -87,6 +116,7 @@ export default class AtmosPreferences extends ExtensionPreferences {
         });
 
         const controls = {
+            startupGroup,
             startupRow,
             startupSwitch,
             dependencyBanner,
@@ -113,9 +143,11 @@ export default class AtmosPreferences extends ExtensionPreferences {
 
     _syncDependency(controls) {
         controls.dependencyBanner.revealed = false;
+        controls.dependencyBanner.title = 'Atmos CLI is not installed';
         controls.dependencyRow.subtitle = 'Checking';
         controls.dependencyIcon.icon_name = 'network-vpn-acquiring-symbolic';
         controls.installButton.visible = false;
+        controls.startupGroup.visible = false;
 
         if (!controls.helperPath) {
             this._setHelperUnavailable(controls, `${HELPER_NAME} was not found`);
@@ -125,23 +157,38 @@ export default class AtmosPreferences extends ExtensionPreferences {
         this._runJSONHelper(controls.helperPath, ['version'], (success, result, error) => {
             if (!success) {
                 console.warn(`Atmos CLI version check failed: ${error}`);
-                this._setHelperUnavailable(controls, `${HELPER_NAME} could not be run`);
+                this._setHelperUnavailable(
+                    controls,
+                    `${HELPER_NAME} could not be run`,
+                    'Atmos CLI could not be run');
                 return;
             }
 
-            const version = result?.version ? `${HELPER_NAME} ${result.version}` : HELPER_NAME;
+            const helperVersion = result?.version;
+            const version = helperVersion ? `${HELPER_NAME} ${helperVersion}` : HELPER_NAME;
+            if (!helperVersionSupported(helperVersion)) {
+                this._setHelperUnavailable(
+                    controls,
+                    `${version} at ${controls.helperPath}`,
+                    `Requires ${HELPER_NAME} ${MIN_HELPER_VERSION_NAME}+`);
+                return;
+            }
+
             controls.dependencyRow.subtitle = `${version} at ${controls.helperPath}`;
             controls.dependencyIcon.icon_name = 'emblem-ok-symbolic';
             controls.installButton.visible = false;
+            controls.startupGroup.visible = true;
             this._syncStartup(controls);
         });
     }
 
-    _setHelperUnavailable(controls, detail) {
+    _setHelperUnavailable(controls, detail, title = 'Atmos CLI is not installed') {
+        controls.dependencyBanner.title = title;
         controls.dependencyBanner.revealed = true;
         controls.dependencyRow.subtitle = detail;
         controls.dependencyIcon.icon_name = 'dialog-warning-symbolic';
         controls.installButton.visible = true;
+        controls.startupGroup.visible = false;
         controls.startupRow.subtitle = 'Unavailable';
         controls.startupSwitch.sensitive = false;
     }
@@ -150,15 +197,15 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.startupSwitch.sensitive = false;
         controls.startupRow.subtitle = 'Checking';
 
-        this._runJSONHelper(controls.helperPath, ['autostart', 'status'], (success, status, error) => {
+        this._runJSONHelper(controls.helperPath, ['gui-autostart', 'status'], (success, status, error) => {
             if (!success) {
-                console.warn(`Atmos autostart status failed: ${error}`);
+                console.warn(`Atmos GUI autostart status failed: ${error}`);
                 controls.startupRow.subtitle = 'Unavailable';
                 return;
             }
 
             this._setStartupSwitch(controls, Boolean(status?.enabled));
-            controls.startupRow.subtitle = this._formatAutostartStatus(status);
+            controls.startupRow.subtitle = this._formatGuiAutostartStatus(status);
             controls.startupSwitch.sensitive = true;
         });
     }
@@ -174,11 +221,11 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.startupSwitch.sensitive = false;
         controls.startupRow.subtitle = 'Saving';
 
-        this._runJSONHelper(controls.helperPath, ['autostart', command], (success, result, error) => {
+        this._runJSONHelper(controls.helperPath, ['gui-autostart', command], (success, result, error) => {
             controls.busy = false;
 
             if (!success || result?.ok === false) {
-                console.warn(`Atmos autostart ${command} failed: ${error}`);
+                console.warn(`Atmos GUI autostart ${command} failed: ${error}`);
                 controls.startupRow.subtitle = 'Failed to save';
                 this._setStartupSwitch(controls, !enabled);
                 controls.startupSwitch.sensitive = true;
@@ -195,15 +242,17 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.syncing = false;
     }
 
-    _formatAutostartStatus(status) {
-        const override = status?.overrideHidden
-            ? 'autostart override hidden'
-            : 'autostart override absent';
-        const service = status?.serviceEnabled
-            ? 'user service enabled'
-            : 'user service disabled';
+    _formatGuiAutostartStatus(status) {
+        if (status?.enabled && status?.serviceEnabled)
+            return 'GUI opens at login. Service also starts in background.';
 
-        return `${override}, ${service}`;
+        if (status?.enabled)
+            return 'GUI opens at login. Service starts when needed.';
+
+        if (status?.serviceEnabled)
+            return 'GUI stays closed. Service starts in background.';
+
+        return 'GUI hidden at login, but service startup is disabled.';
     }
 
     _openInstallPage() {
