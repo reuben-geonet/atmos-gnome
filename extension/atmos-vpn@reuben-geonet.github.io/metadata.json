@@ -4,6 +4,6 @@
   "description": "Quick Settings toggle for Atmos Agent VPN pause and resume.",
   "shell-version": ["50"],
   "url": "https://github.com/reuben-geonet/atmos-gnome",
-  "version": 1,
-  "version-name": "0.1.0"
+  "version": 2,
+  "version-name": "0.1.1"
 }
