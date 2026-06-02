@@ -206,6 +206,9 @@ class AtmosToggle extends QuickToggle {
     }
 
     _runHelper(args, callback) {
+        if (!this._helperPath)
+            this._helperPath = findAtmosctl();
+
         if (!this._helperPath) {
             callback(false, '', `${HELPER_NAME} not found`);
             return;

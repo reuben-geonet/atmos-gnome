@@ -11,6 +11,9 @@ Atmos Agent product.
 - Atmos Agent installed locally.
 - `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli).
 
+If `atmosctl` is missing, the extension preferences show a warning and link to
+the `atmos-cli` repository.
+
 ## Build
 
 ```sh
