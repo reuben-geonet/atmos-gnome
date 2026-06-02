@@ -8,14 +8,6 @@ GNOME Shell Quick Settings toggle for the Atmos Agent VPN client.
 - `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli),
   with `--json` support.
 
-## Build
-
-```sh
-make pack
-```
-
-This creates `<extension-uuid>.shell-extension.zip` in the repository root.
-
 ## Install
 
 ### From GNOME Extensions (Recommended)
@@ -25,6 +17,16 @@ This creates `<extension-uuid>.shell-extension.zip` in the repository root.
 [<img width="200" alt="Get it on GNOME Extensions" src="https://github.com/andyholmes/gnome-shell-extensions-badge/raw/master/get-it-on-ego.png">](https://extensions.gnome.org/extension/10075/atmos-vpn/)
 
 ### From Source
+
+#### Build
+
+```sh
+make pack
+```
+
+This creates `<extension-uuid>.shell-extension.zip` in the repository root.
+
+#### Install
 
 ```sh
 make install
