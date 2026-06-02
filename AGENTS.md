@@ -49,6 +49,9 @@ It requires repository secrets:
 The workflow packs the extension with `gnome-extensions pack` and uploads it
 with `gnome-extensions upload --accept-tos`.
 
+Pin all GitHub Actions `uses:` references to full commit SHAs. Do not use
+floating version tags such as `@v6`.
+
 ## Commit Style
 
 Use Conventional Commits for all commits, for example:
