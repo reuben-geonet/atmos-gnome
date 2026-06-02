@@ -41,82 +41,88 @@ export default class AtmosPreferences extends ExtensionPreferences {
             title: 'Startup',
         });
 
-        this._startupRow = new Adw.ActionRow({
+        const startupRow = new Adw.ActionRow({
             title: 'Start at login without window',
             subtitle: 'Checking',
         });
 
-        this._startupSwitch = new Gtk.Switch({
+        const startupSwitch = new Gtk.Switch({
             valign: Gtk.Align.CENTER,
             sensitive: false,
         });
-        this._startupRow.add_suffix(this._startupSwitch);
-        this._startupRow.activatable_widget = this._startupSwitch;
 
-        this._startupSwitch.connect('notify::active', () => this._onStartupSwitchChanged());
+        const controls = {
+            row: startupRow,
+            switch: startupSwitch,
+            helperPath: findAtmosctl(),
+            busy: false,
+            syncing: false,
+        };
 
-        group.add(this._startupRow);
+        startupRow.add_suffix(startupSwitch);
+        startupRow.activatable_widget = startupSwitch;
+
+        startupSwitch.connect('notify::active', () => this._onStartupSwitchChanged(controls));
+
+        group.add(startupRow);
         page.add(group);
         window.add(page);
 
-        this._helperPath = findAtmosctl();
-        this._startupBusy = false;
-        this._startupSyncing = false;
-        this._syncStartup();
+        this._syncStartup(controls);
     }
 
-    _syncStartup() {
-        this._startupSwitch.sensitive = false;
-        this._startupRow.subtitle = 'Checking';
+    _syncStartup(controls) {
+        controls.switch.sensitive = false;
+        controls.row.subtitle = 'Checking';
 
-        this._runHelper(['autostart', 'status'], (success, stdout, stderr) => {
+        this._runHelper(controls.helperPath, ['autostart', 'status'], (success, stdout, stderr) => {
             if (!success) {
                 console.warn(`Atmos autostart status failed: ${stderr || stdout}`);
-                this._startupRow.subtitle = 'Unavailable';
+                controls.row.subtitle = 'Unavailable';
                 return;
             }
 
             const [state, detail = ''] = stdout.trim().split(/\t/, 2);
-            this._setStartupSwitch(state === 'enabled');
-            this._startupRow.subtitle = detail || (state === 'enabled' ? 'Enabled' : 'Disabled');
-            this._startupSwitch.sensitive = true;
+            this._setStartupSwitch(controls, state === 'enabled');
+            controls.row.subtitle = detail || (state === 'enabled' ? 'Enabled' : 'Disabled');
+            controls.switch.sensitive = true;
         });
     }
 
-    _onStartupSwitchChanged() {
-        if (this._startupSyncing || this._startupBusy)
+    _onStartupSwitchChanged(controls) {
+        if (controls.syncing || controls.busy)
             return;
 
-        const enabled = this._startupSwitch.active;
+        const enabled = controls.switch.active;
         const command = enabled ? 'enable' : 'disable';
 
-        this._startupBusy = true;
-        this._startupSwitch.sensitive = false;
-        this._startupRow.subtitle = 'Saving';
+        controls.busy = true;
+        controls.switch.sensitive = false;
+        controls.row.subtitle = 'Saving';
 
-        this._runHelper(['autostart', command], (success, stdout, stderr) => {
-            this._startupBusy = false;
+        this._runHelper(controls.helperPath, ['autostart', command], (success, stdout, stderr) => {
+            controls.busy = false;
 
             if (!success) {
                 console.warn(`Atmos autostart ${command} failed: ${stderr || stdout}`);
-                this._startupRow.subtitle = 'Failed to save';
-                this._setStartupSwitch(!enabled);
-                this._startupSwitch.sensitive = true;
+                controls.row.subtitle = 'Failed to save';
+                this._setStartupSwitch(controls, !enabled);
+                controls.switch.sensitive = true;
                 return;
             }
 
-            this._syncStartup();
+            this._syncStartup(controls);
         });
     }
 
-    _setStartupSwitch(enabled) {
-        this._startupSyncing = true;
-        this._startupSwitch.active = enabled;
-        this._startupSyncing = false;
+    _setStartupSwitch(controls, enabled) {
+        controls.syncing = true;
+        controls.switch.active = enabled;
+        controls.syncing = false;
     }
 
-    _runHelper(args, callback) {
-        if (!this._helperPath) {
+    _runHelper(helperPath, args, callback) {
+        if (!helperPath) {
             callback(false, '', `${HELPER_NAME} not found`);
             return;
         }
@@ -124,7 +130,7 @@ export default class AtmosPreferences extends ExtensionPreferences {
         let proc;
         try {
             proc = Gio.Subprocess.new(
-                [this._helperPath, ...args],
+                [helperPath, ...args],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
         } catch (e) {
             callback(false, '', e.message);

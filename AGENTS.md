@@ -10,6 +10,7 @@ and provides the `atmosctl` binary.
   Settings tile.
 - `extension/atmos-toggle@reubena.local/prefs.js`: preferences UI.
 - `extension/atmos-toggle@reubena.local/metadata.json`: extension metadata.
+- `.github/workflows/ci.yml`: package and Shexli static-analysis workflow.
 - `.github/workflows/ego-upload.yml`: release-triggered extensions.gnome.org
   upload workflow.
 - `Makefile`: local pack, install, and cleanup shortcuts.
@@ -48,7 +49,7 @@ tags. The workflow requires repository secrets:
 - `EGO_PASSWORD`
 
 The workflow packs the extension with `gnome-extensions pack` and uploads it
-with `gnome-extensions upload --accept-tos`.
+with `gnome-extensions upload --accept-tos`. Run Shexli before every EGO upload.
 
 Pin all GitHub Actions `uses:` references to full commit SHAs. Do not use
 floating version tags such as `@v6`.
