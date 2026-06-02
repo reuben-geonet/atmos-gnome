@@ -1,6 +1,8 @@
+import Clutter from 'gi://Clutter';
 import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 import GObject from 'gi://GObject';
+import St from 'gi://St';
 
 import {Extension} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
@@ -9,6 +11,8 @@ import {QuickToggle, SystemIndicator} from 'resource:///org/gnome/shell/ui/quick
 const POLL_SECONDS = 5;
 const RESYNC_DELAY_MS = 900;
 const PENDING_TIMEOUT_MS = 45000;
+const TOOLTIP_OFFSET = 6;
+const TOOLTIP_ANIMATION_TIME = 150;
 const VPN_ICON_CONNECTED = 'network-vpn-symbolic';
 const VPN_ICON_PENDING = 'network-vpn-acquiring-symbolic';
 const VPN_ICON_PAUSED = 'network-vpn-disabled-symbolic';
@@ -54,10 +58,17 @@ class AtmosToggle extends QuickToggle {
         this._agentActive = true;
         this._pendingState = null;
         this._pendingSinceMs = 0;
+        this._statusDetail = '';
+        this._tooltip = new St.Label({
+            style_class: 'dash-label',
+            visible: false,
+        });
+        Main.uiGroup.add_child(this._tooltip);
         this.reactive = false;
 
         this.connectObject(
             'clicked', () => this._toggleAtmos(),
+            'notify::hover', () => this._syncTooltip(),
             'destroy', () => this._destroy(),
             this);
 
@@ -77,6 +88,10 @@ class AtmosToggle extends QuickToggle {
         if (this._resyncId) {
             GLib.source_remove(this._resyncId);
             this._resyncId = 0;
+        }
+        if (this._tooltip) {
+            this._tooltip.destroy();
+            this._tooltip = null;
         }
     }
 
@@ -98,7 +113,7 @@ class AtmosToggle extends QuickToggle {
             if (!success || result?.ok === false) {
                 console.warn(`Atmos ${command} failed: ${error}`);
                 this._clearPendingState();
-                this._setError();
+                this._setError(error || `${HELPER_NAME} ${command} failed`);
                 return;
             }
 
@@ -125,7 +140,7 @@ class AtmosToggle extends QuickToggle {
         this._runJSONHelper(['vpn', 'status'], (success, status, error) => {
             if (!success) {
                 console.warn(`Atmos status failed: ${error}`);
-                this._setError();
+                this._setError(error);
                 return;
             }
 
@@ -145,6 +160,7 @@ class AtmosToggle extends QuickToggle {
 
         this._agentActive = true;
         this.reactive = true;
+        this._setStatusDetail('');
 
         if (this._pendingState) {
             if (state === this._pendingState) {
@@ -188,6 +204,7 @@ class AtmosToggle extends QuickToggle {
         this.checked = false;
         this.iconName = VPN_ICON_AGENT_STOPPED;
         this.subtitle = this._agentSubtitle(status?.serviceState);
+        this._setStatusDetail(this._agentDetail(status));
         this._indicator.visible = false;
     }
 
@@ -206,6 +223,13 @@ class AtmosToggle extends QuickToggle {
         }
     }
 
+    _agentDetail(status) {
+        const service = status?.service ?? 'atmos-agent.service';
+        const serviceState = status?.serviceState ?? 'unavailable';
+
+        return `${service} is ${serviceState}.`;
+    }
+
     _setPendingState(state) {
         this._pendingState = state;
         this._pendingSinceMs = Date.now();
@@ -222,40 +246,128 @@ class AtmosToggle extends QuickToggle {
             this.checked = true;
             this.iconName = VPN_ICON_PENDING;
             this.subtitle = 'Resuming';
+            this._setStatusDetail('');
             this._indicator.icon_name = VPN_ICON_PENDING;
             this._indicator.visible = true;
         } else if (this._pendingState === 'disconnected') {
             this.checked = false;
             this.iconName = VPN_ICON_PAUSED;
             this.subtitle = 'Pausing';
+            this._setStatusDetail('');
             this._indicator.visible = false;
         }
     }
 
-    _setError() {
+    _setError(error) {
+        const {subtitle, detail} = this._errorStatus(error);
+
         this._helperAvailable = false;
         this._agentActive = false;
         this.reactive = false;
         this.checked = false;
         this.iconName = VPN_ICON_PAUSED;
-        this.subtitle = 'Unavailable';
+        this.subtitle = subtitle;
+        this._setStatusDetail(detail);
         this._indicator.visible = false;
     }
 
-    _runJSONHelper(args, callback) {
+    _errorStatus(error) {
+        const detail = String(error || 'The status command failed.').trim();
+
+        if (detail === `${HELPER_NAME} not found`) {
+            return {
+                subtitle: 'CLI not found',
+                detail: `${HELPER_NAME} is not installed or is not in a common path.`,
+            };
+        }
+
+        if (detail.includes(HELPER_NAME) && detail.includes('No such file or directory'))
+            return {subtitle: 'CLI missing', detail};
+
+        if (detail.startsWith('invalid JSON:'))
+            return {subtitle: 'CLI output invalid', detail};
+
+        if (detail.includes('Operation not permitted'))
+            return {subtitle: 'Status blocked', detail};
+
+        return {subtitle: 'Status unavailable', detail};
+    }
+
+    _setStatusDetail(detail) {
+        this._statusDetail = detail;
+        this.get_accessible()?.set_description(detail);
+        this._syncTooltip();
+    }
+
+    _syncTooltip() {
+        if (!this._tooltip)
+            return;
+
+        const showTooltip = Boolean(this.hover && this._statusDetail);
+
+        if (showTooltip) {
+            this._tooltip.set({
+                text: this._statusDetail,
+                visible: true,
+                opacity: 0,
+            });
+
+            const [stageX, stageY] = this.get_transformed_position();
+            const [tileWidth, tileHeight] = this.allocation.get_size();
+            const [tooltipWidth, tooltipHeight] = this._tooltip.get_size();
+            const xOffset = Math.floor((tileWidth - tooltipWidth) / 2);
+            const monitor = Main.layoutManager.findMonitorForActor(this);
+            const x = Math.clamp(
+                stageX + xOffset,
+                monitor.x,
+                monitor.x + monitor.width - tooltipWidth);
+            const y = stageY - monitor.y > tooltipHeight + TOOLTIP_OFFSET
+                ? stageY - tooltipHeight - TOOLTIP_OFFSET
+                : stageY + tileHeight + TOOLTIP_OFFSET;
+            this._tooltip.set_position(x, y);
+        }
+
+        this._tooltip.ease({
+            opacity: showTooltip ? 255 : 0,
+            duration: TOOLTIP_ANIMATION_TIME,
+            mode: Clutter.AnimationMode.EASE_OUT_QUAD,
+            onComplete: () => {
+                if (this._tooltip)
+                    this._tooltip.visible = Boolean(showTooltip);
+            },
+        });
+    }
+
+    _newHelperProcess(args) {
         if (!this._helperPath)
             this._helperPath = findAtmosctl();
 
-        if (!this._helperPath) {
-            callback(false, '', `${HELPER_NAME} not found`);
-            return;
-        }
+        if (!this._helperPath)
+            throw new Error(`${HELPER_NAME} not found`);
 
-        let proc;
+        const helperPath = this._helperPath;
+
         try {
-            proc = Gio.Subprocess.new(
+            return Gio.Subprocess.new(
+                [helperPath, '--json', ...args],
+                Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        } catch (e) {
+            this._helperPath = null;
+            this._helperPath = findAtmosctl();
+
+            if (!this._helperPath || this._helperPath === helperPath)
+                throw e;
+
+            return Gio.Subprocess.new(
                 [this._helperPath, '--json', ...args],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
+        }
+    }
+
+    _runJSONHelper(args, callback) {
+        let proc;
+        try {
+            proc = this._newHelperProcess(args);
         } catch (e) {
             callback(false, '', e.message);
             return;
