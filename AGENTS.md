@@ -10,8 +10,8 @@ and provides the `atmosctl` binary.
   Settings tile.
 - `extension/atmos-toggle@reubena.local/prefs.js`: preferences UI.
 - `extension/atmos-toggle@reubena.local/metadata.json`: extension metadata.
-- `.github/workflows/ego-upload.yml`: manual extensions.gnome.org upload
-  workflow.
+- `.github/workflows/ego-upload.yml`: release-triggered extensions.gnome.org
+  upload workflow.
 - `Makefile`: local pack, install, and cleanup shortcuts.
 
 ## Commands
@@ -40,8 +40,9 @@ atmosctl autostart status
 
 ## GitHub Actions
 
-`Upload to EGO` is a manual workflow for publishing to extensions.gnome.org.
-It requires repository secrets:
+`Upload to EGO` publishes to extensions.gnome.org when a GitHub Release is
+published. Releases are tag-backed, so publish only from intentional release
+tags. The workflow requires repository secrets:
 
 - `EGO_USERNAME`
 - `EGO_PASSWORD`

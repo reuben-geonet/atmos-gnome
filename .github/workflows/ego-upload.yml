@@ -1,12 +1,8 @@
 name: Upload to EGO
 
 on:
-  workflow_dispatch:
-    inputs:
-      accept_tos:
-        description: "Type yes to accept the extensions.gnome.org upload terms"
-        required: true
-        default: "no"
+  release:
+    types: [published]
 
 permissions:
   contents: read
@@ -15,7 +11,6 @@ jobs:
   upload:
     name: Pack and upload
     runs-on: ubuntu-latest
-    if: github.event.inputs.accept_tos == 'yes'
 
     steps:
       - name: Check out repository

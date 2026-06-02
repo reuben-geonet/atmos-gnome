@@ -31,5 +31,5 @@ On Wayland, log out and back in after installing or updating the extension.
 ## Publishing
 
 The `Upload to EGO` GitHub Actions workflow packs the extension and uploads it
-to extensions.gnome.org. It is manual-only and requires `EGO_USERNAME` and
-`EGO_PASSWORD` repository secrets.
+to extensions.gnome.org when a GitHub Release is published. It requires
+`EGO_USERNAME` and `EGO_PASSWORD` repository secrets.
