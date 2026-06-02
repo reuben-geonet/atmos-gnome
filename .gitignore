@@ -1,0 +1,18 @@
+# Local agent/tooling state
+.agents/
+.codex/
+
+# Downloaded local toolchains
+.tools/
+
+# Build outputs
+*.shell-extension.zip
+.split/
+
+# Local/vendor packages used for reverse engineering
+*.rpm
+
+# Temporary files
+*.log
+*.tmp
+*.bak
