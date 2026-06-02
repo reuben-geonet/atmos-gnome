@@ -1,4 +1,4 @@
-# Atmos GNOME
+# <img src="resources/images/atmos-vpn-logo-header.png" height="32" alt="Atmos VPN logo"/> Atmos GNOME
 
 GNOME Shell Quick Settings toggle for the Atmos Agent VPN client.
 
