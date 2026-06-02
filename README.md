@@ -9,7 +9,8 @@ Atmos Agent product.
 
 - GNOME Shell 50.
 - Atmos Agent installed locally.
-- `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli).
+- `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli),
+  with `--json` support.
 
 If `atmosctl` is missing, the extension preferences show a warning and link to
 the `atmos-cli` repository.
@@ -20,14 +21,16 @@ the `atmos-cli` repository.
 make pack
 ```
 
-This creates `atmos-toggle@reubena.local.shell-extension.zip`.
+This creates `<extension-uuid>.shell-extension.zip` in the repository root.
 
 ## Install
 
 ```sh
 make install
-gnome-extensions enable atmos-toggle@reubena.local
+gnome-extensions enable <extension-uuid>
 ```
+
+Use the UUID from `extension/*/metadata.json`.
 
 On Wayland, log out and back in after installing or updating the extension.
 

@@ -12,6 +12,7 @@ const PENDING_TIMEOUT_MS = 45000;
 const VPN_ICON_CONNECTED = 'network-vpn-symbolic';
 const VPN_ICON_PENDING = 'network-vpn-acquiring-symbolic';
 const VPN_ICON_PAUSED = 'network-vpn-disabled-symbolic';
+const VPN_ICON_AGENT_STOPPED = 'dialog-warning-symbolic';
 const HELPER_NAME = 'atmosctl';
 
 function findAtmosctl() {
@@ -50,8 +51,10 @@ class AtmosToggle extends QuickToggle {
         this._resyncId = 0;
         this._busy = false;
         this._helperAvailable = true;
+        this._agentActive = true;
         this._pendingState = null;
         this._pendingSinceMs = 0;
+        this.reactive = false;
 
         this.connectObject(
             'clicked', () => this._toggleAtmos(),
@@ -78,7 +81,7 @@ class AtmosToggle extends QuickToggle {
     }
 
     _toggleAtmos() {
-        if (this._busy || !this._helperAvailable)
+        if (this._busy || !this._helperAvailable || !this._agentActive)
             return;
 
         const desiredConnected = this.checked;
@@ -88,12 +91,12 @@ class AtmosToggle extends QuickToggle {
         this.reactive = false;
         this._setPendingState(desiredConnected ? 'connected' : 'disconnected');
 
-        this._runHelper(['vpn', command], (success, stdout, stderr) => {
+        this._runJSONHelper(['vpn', command], (success, result, error) => {
             this._busy = false;
             this.reactive = true;
 
-            if (!success) {
-                console.warn(`Atmos ${command} failed: ${stderr || stdout}`);
+            if (!success || result?.ok === false) {
+                console.warn(`Atmos ${command} failed: ${error}`);
                 this._clearPendingState();
                 this._setError();
                 return;
@@ -119,21 +122,29 @@ class AtmosToggle extends QuickToggle {
         if (this._busy)
             return;
 
-        this._runHelper(['vpn', 'status'], (success, stdout, stderr) => {
+        this._runJSONHelper(['vpn', 'status'], (success, status, error) => {
             if (!success) {
-                console.warn(`Atmos status failed: ${stderr || stdout}`);
+                console.warn(`Atmos status failed: ${error}`);
                 this._setError();
                 return;
             }
 
             this._helperAvailable = true;
-            this.reactive = true;
-            this._setState(stdout.trim());
+            this._setState(status);
         });
     }
 
-    _setState(statusLine) {
-        const [state] = statusLine.split(/\s+/, 1);
+    _setState(status) {
+        const state = status?.state ?? 'unknown';
+
+        if (status?.serviceActive === false) {
+            this._clearPendingState();
+            this._setAgentStopped(status);
+            return;
+        }
+
+        this._agentActive = true;
+        this.reactive = true;
 
         if (this._pendingState) {
             if (state === this._pendingState) {
@@ -170,6 +181,31 @@ class AtmosToggle extends QuickToggle {
         }
     }
 
+    _setAgentStopped(status) {
+        this._helperAvailable = true;
+        this._agentActive = false;
+        this.reactive = false;
+        this.checked = false;
+        this.iconName = VPN_ICON_AGENT_STOPPED;
+        this.subtitle = this._agentSubtitle(status?.serviceState);
+        this._indicator.visible = false;
+    }
+
+    _agentSubtitle(serviceState) {
+        switch (serviceState) {
+        case 'failed':
+            return 'Agent failed';
+        case 'activating':
+            return 'Agent starting';
+        case 'deactivating':
+            return 'Agent stopping';
+        case 'inactive':
+            return 'Agent stopped';
+        default:
+            return 'Agent unavailable';
+        }
+    }
+
     _setPendingState(state) {
         this._pendingState = state;
         this._pendingSinceMs = Date.now();
@@ -198,6 +234,7 @@ class AtmosToggle extends QuickToggle {
 
     _setError() {
         this._helperAvailable = false;
+        this._agentActive = false;
         this.reactive = false;
         this.checked = false;
         this.iconName = VPN_ICON_PAUSED;
@@ -205,7 +242,7 @@ class AtmosToggle extends QuickToggle {
         this._indicator.visible = false;
     }
 
-    _runHelper(args, callback) {
+    _runJSONHelper(args, callback) {
         if (!this._helperPath)
             this._helperPath = findAtmosctl();
 
@@ -217,7 +254,7 @@ class AtmosToggle extends QuickToggle {
         let proc;
         try {
             proc = Gio.Subprocess.new(
-                [this._helperPath, ...args],
+                [this._helperPath, '--json', ...args],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
         } catch (e) {
             callback(false, '', e.message);
@@ -227,9 +264,18 @@ class AtmosToggle extends QuickToggle {
         proc.communicate_utf8_async(null, null, (source, result) => {
             try {
                 const [success, stdout, stderr] = source.communicate_utf8_finish(result);
-                callback(success && source.get_successful(), stdout ?? '', stderr ?? '');
+                if (!success || !source.get_successful()) {
+                    callback(false, null, stderr || stdout || 'command failed');
+                    return;
+                }
+
+                try {
+                    callback(true, JSON.parse(stdout), '');
+                } catch (e) {
+                    callback(false, null, `invalid JSON: ${e.message}`);
+                }
             } catch (e) {
-                callback(false, '', e.message);
+                callback(false, null, e.message);
             }
         });
     }

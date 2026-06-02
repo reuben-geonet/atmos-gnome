@@ -122,14 +122,14 @@ export default class AtmosPreferences extends ExtensionPreferences {
             return;
         }
 
-        this._runHelper(controls.helperPath, ['version'], (success, stdout, stderr) => {
+        this._runJSONHelper(controls.helperPath, ['version'], (success, result, error) => {
             if (!success) {
-                console.warn(`Atmos CLI version check failed: ${stderr || stdout}`);
+                console.warn(`Atmos CLI version check failed: ${error}`);
                 this._setHelperUnavailable(controls, `${HELPER_NAME} could not be run`);
                 return;
             }
 
-            const version = stdout.trim() || HELPER_NAME;
+            const version = result?.version ? `${HELPER_NAME} ${result.version}` : HELPER_NAME;
             controls.dependencyRow.subtitle = `${version} at ${controls.helperPath}`;
             controls.dependencyIcon.icon_name = 'emblem-ok-symbolic';
             controls.installButton.visible = false;
@@ -150,16 +150,15 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.startupSwitch.sensitive = false;
         controls.startupRow.subtitle = 'Checking';
 
-        this._runHelper(controls.helperPath, ['autostart', 'status'], (success, stdout, stderr) => {
+        this._runJSONHelper(controls.helperPath, ['autostart', 'status'], (success, status, error) => {
             if (!success) {
-                console.warn(`Atmos autostart status failed: ${stderr || stdout}`);
+                console.warn(`Atmos autostart status failed: ${error}`);
                 controls.startupRow.subtitle = 'Unavailable';
                 return;
             }
 
-            const [state, detail = ''] = stdout.trim().split(/\t/, 2);
-            this._setStartupSwitch(controls, state === 'enabled');
-            controls.startupRow.subtitle = detail || (state === 'enabled' ? 'Enabled' : 'Disabled');
+            this._setStartupSwitch(controls, Boolean(status?.enabled));
+            controls.startupRow.subtitle = this._formatAutostartStatus(status);
             controls.startupSwitch.sensitive = true;
         });
     }
@@ -175,11 +174,11 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.startupSwitch.sensitive = false;
         controls.startupRow.subtitle = 'Saving';
 
-        this._runHelper(controls.helperPath, ['autostart', command], (success, stdout, stderr) => {
+        this._runJSONHelper(controls.helperPath, ['autostart', command], (success, result, error) => {
             controls.busy = false;
 
-            if (!success) {
-                console.warn(`Atmos autostart ${command} failed: ${stderr || stdout}`);
+            if (!success || result?.ok === false) {
+                console.warn(`Atmos autostart ${command} failed: ${error}`);
                 controls.startupRow.subtitle = 'Failed to save';
                 this._setStartupSwitch(controls, !enabled);
                 controls.startupSwitch.sensitive = true;
@@ -196,6 +195,17 @@ export default class AtmosPreferences extends ExtensionPreferences {
         controls.syncing = false;
     }
 
+    _formatAutostartStatus(status) {
+        const override = status?.overrideHidden
+            ? 'autostart override hidden'
+            : 'autostart override absent';
+        const service = status?.serviceEnabled
+            ? 'user service enabled'
+            : 'user service disabled';
+
+        return `${override}, ${service}`;
+    }
+
     _openInstallPage() {
         try {
             Gio.AppInfo.launch_default_for_uri(INSTALL_URL, null);
@@ -204,7 +214,7 @@ export default class AtmosPreferences extends ExtensionPreferences {
         }
     }
 
-    _runHelper(helperPath, args, callback) {
+    _runJSONHelper(helperPath, args, callback) {
         if (!helperPath) {
             callback(false, '', `${HELPER_NAME} not found`);
             return;
@@ -213,7 +223,7 @@ export default class AtmosPreferences extends ExtensionPreferences {
         let proc;
         try {
             proc = Gio.Subprocess.new(
-                [helperPath, ...args],
+                [helperPath, '--json', ...args],
                 Gio.SubprocessFlags.STDOUT_PIPE | Gio.SubprocessFlags.STDERR_PIPE);
         } catch (e) {
             callback(false, '', e.message);
@@ -223,9 +233,18 @@ export default class AtmosPreferences extends ExtensionPreferences {
         proc.communicate_utf8_async(null, null, (source, result) => {
             try {
                 const [success, stdout, stderr] = source.communicate_utf8_finish(result);
-                callback(success && source.get_successful(), stdout ?? '', stderr ?? '');
+                if (!success || !source.get_successful()) {
+                    callback(false, null, stderr || stdout || 'command failed');
+                    return;
+                }
+
+                try {
+                    callback(true, JSON.parse(stdout), '');
+                } catch (e) {
+                    callback(false, null, `invalid JSON: ${e.message}`);
+                }
             } catch (e) {
-                callback(false, '', e.message);
+                callback(false, null, e.message);
             }
         });
     }
