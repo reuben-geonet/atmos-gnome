@@ -2,10 +2,16 @@
 
 GNOME Shell Quick Settings toggle for the Atmos Agent VPN client.
 
+## Settings
+
+The Atmos VPN GUI startup behavior can be managed from the extension settings.
+
+![Atmos VPN settings screenshot](resources/images/atmos-vpn-settings.png)
+
 ## Requirements
 
 - Atmos Agent installed locally.
-- `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli)
+- `atmosctl` 0.2.0 or newer from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli)
 
 ## Install
 
