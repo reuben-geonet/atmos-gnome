@@ -5,8 +5,7 @@ GNOME Shell Quick Settings toggle for the Atmos Agent VPN client.
 ## Requirements
 
 - Atmos Agent installed locally.
-- `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli),
-  with `--json` support.
+- `atmosctl` from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli)
 
 ## Install
 
