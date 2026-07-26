@@ -11,7 +11,10 @@ The Atmos VPN GUI startup behavior can be managed from the extension settings.
 ## Requirements
 
 - Atmos Agent installed locally.
-- `atmosctl` 0.2.0 or newer from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli)
+- `atmosctl` 0.3.0 or newer from [`atmos-cli`](https://github.com/reuben-geonet/atmos-cli)
+
+When Atmos is logged out, the Quick Settings tile shows `Logged out` and opens
+the Atmos application when clicked instead of trying to resume the VPN.
 
 ## Install
 

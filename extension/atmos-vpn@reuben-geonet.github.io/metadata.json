@@ -4,6 +4,6 @@
   "description": "GNOME Quick Settings integration for Atmos VPN.",
   "shell-version": ["50"],
   "url": "https://github.com/reuben-geonet/atmos-gnome",
-  "version": 3,
-  "version-name": "0.1.2"
+  "version": 4,
+  "version-name": "0.2.0"
 }

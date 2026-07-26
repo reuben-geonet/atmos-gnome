@@ -6,8 +6,8 @@ import Gtk from 'gi://Gtk';
 import {ExtensionPreferences} from 'resource:///org/gnome/Shell/Extensions/js/extensions/prefs.js';
 
 const HELPER_NAME = 'atmosctl';
-const MIN_HELPER_VERSION = [0, 2, 0];
-const MIN_HELPER_VERSION_NAME = '0.2.0';
+const MIN_HELPER_VERSION = [0, 3, 0];
+const MIN_HELPER_VERSION_NAME = '0.3.0';
 const INSTALL_URL = 'https://github.com/reuben-geonet/atmos-cli';
 
 function findAtmosctl() {

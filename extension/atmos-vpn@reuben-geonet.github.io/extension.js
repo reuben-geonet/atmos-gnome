@@ -57,6 +57,7 @@ class AtmosToggle extends QuickToggle {
         this._busy = false;
         this._helperAvailable = true;
         this._agentActive = true;
+        this._loggedIn = null;
         this._pendingState = null;
         this._pendingSinceMs = 0;
         this._statusDetail = '';
@@ -100,6 +101,15 @@ class AtmosToggle extends QuickToggle {
 
     _toggleAtmos() {
         if (this._destroyed || this._busy || !this._helperAvailable || !this._agentActive)
+            return;
+
+        if (this._loggedIn === false) {
+            this.checked = false;
+            this._openAtmos();
+            return;
+        }
+
+        if (this._loggedIn !== true)
             return;
 
         const desiredConnected = this.checked;
@@ -173,7 +183,20 @@ class AtmosToggle extends QuickToggle {
             return;
         }
 
+        if (status?.loggedIn === false) {
+            this._clearPendingState();
+            this._setLoggedOut();
+            return;
+        }
+
+        if (status?.loggedIn !== true) {
+            this._clearPendingState();
+            this._setLoginUnavailable();
+            return;
+        }
+
         this._agentActive = true;
+        this._loggedIn = true;
         this.reactive = true;
         this._setStatusDetail('');
 
@@ -215,12 +238,52 @@ class AtmosToggle extends QuickToggle {
     _setAgentStopped(status) {
         this._helperAvailable = true;
         this._agentActive = false;
+        this._loggedIn = null;
         this.reactive = false;
         this.checked = false;
         this.iconName = VPN_ICON_AGENT_STOPPED;
         this.subtitle = this._agentSubtitle(status?.serviceState);
         this._setStatusDetail(this._agentDetail(status));
         this._indicator.visible = false;
+    }
+
+    _setLoggedOut() {
+        this._helperAvailable = true;
+        this._agentActive = true;
+        this._loggedIn = false;
+        this.reactive = true;
+        this.checked = false;
+        this.iconName = VPN_ICON_PAUSED;
+        this.subtitle = 'Logged out';
+        this._setStatusDetail('Click to open Atmos and log in.');
+        this._indicator.visible = false;
+    }
+
+    _setLoginUnavailable() {
+        this._helperAvailable = true;
+        this._agentActive = true;
+        this._loggedIn = null;
+        this.reactive = false;
+        this.checked = false;
+        this.iconName = VPN_ICON_PAUSED;
+        this.subtitle = 'Login status unavailable';
+        this._setStatusDetail('Atmos login status could not be determined.');
+        this._indicator.visible = false;
+    }
+
+    _openAtmos() {
+        try {
+            const app = Gio.DesktopAppInfo.new('AtmosAgent.desktop');
+            if (app) {
+                app.launch([], null);
+                return;
+            }
+
+            Gio.AppInfo.launch_default_for_uri('axis:', null);
+        } catch (e) {
+            console.warn(`Failed to open Atmos: ${e.message}`);
+            this._setStatusDetail(`Failed to open Atmos: ${e.message}`);
+        }
     }
 
     _agentSubtitle(serviceState) {
@@ -278,6 +341,7 @@ class AtmosToggle extends QuickToggle {
 
         this._helperAvailable = false;
         this._agentActive = false;
+        this._loggedIn = null;
         this.reactive = false;
         this.checked = false;
         this.iconName = VPN_ICON_PAUSED;
