@@ -51,6 +51,7 @@ class AtmosToggle extends QuickToggle {
 
         this._helperPath = helperPath;
         this._indicator = indicator;
+        this._destroyed = false;
         this._pollId = 0;
         this._resyncId = 0;
         this._busy = false;
@@ -81,6 +82,8 @@ class AtmosToggle extends QuickToggle {
     }
 
     _destroy() {
+        this._destroyed = true;
+
         if (this._pollId) {
             GLib.source_remove(this._pollId);
             this._pollId = 0;
@@ -96,7 +99,7 @@ class AtmosToggle extends QuickToggle {
     }
 
     _toggleAtmos() {
-        if (this._busy || !this._helperAvailable || !this._agentActive)
+        if (this._destroyed || this._busy || !this._helperAvailable || !this._agentActive)
             return;
 
         const desiredConnected = this.checked;
@@ -107,6 +110,9 @@ class AtmosToggle extends QuickToggle {
         this._setPendingState(desiredConnected ? 'connected' : 'disconnected');
 
         this._runJSONHelper(['vpn', command], (success, result, error) => {
+            if (this._destroyed)
+                return;
+
             this._busy = false;
             this.reactive = true;
 
@@ -122,10 +128,16 @@ class AtmosToggle extends QuickToggle {
     }
 
     _scheduleSync(delayMs = RESYNC_DELAY_MS) {
+        if (this._destroyed)
+            return;
+
         if (this._resyncId)
             GLib.source_remove(this._resyncId);
 
         this._resyncId = GLib.timeout_add(GLib.PRIORITY_DEFAULT, delayMs, () => {
+            if (this._destroyed)
+                return GLib.SOURCE_REMOVE;
+
             this._resyncId = 0;
             this._sync();
             return GLib.SOURCE_REMOVE;
@@ -134,10 +146,13 @@ class AtmosToggle extends QuickToggle {
     }
 
     _sync() {
-        if (this._busy)
+        if (this._destroyed || this._busy)
             return;
 
         this._runJSONHelper(['vpn', 'status'], (success, status, error) => {
+            if (this._destroyed)
+                return;
+
             if (!success) {
                 console.warn(`Atmos status failed: ${error}`);
                 this._setError(error);
@@ -300,7 +315,7 @@ class AtmosToggle extends QuickToggle {
     }
 
     _syncTooltip() {
-        if (!this._tooltip)
+        if (this._destroyed || !this._tooltip)
             return;
 
         const showTooltip = Boolean(this.hover && this._statusDetail);
@@ -332,7 +347,7 @@ class AtmosToggle extends QuickToggle {
             duration: TOOLTIP_ANIMATION_TIME,
             mode: Clutter.AnimationMode.EASE_OUT_QUAD,
             onComplete: () => {
-                if (this._tooltip)
+                if (!this._destroyed && this._tooltip)
                     this._tooltip.visible = Boolean(showTooltip);
             },
         });
@@ -405,7 +420,11 @@ class AtmosIndicator extends SystemIndicator {
         this._toggle = new AtmosToggle(helperPath, this._indicator);
         this.quickSettingsItems.push(this._toggle);
 
-        this.connect('destroy', () => this._toggle.destroy());
+        this.connect('destroy', () => {
+            if (this._toggle && !this._toggle._destroyed)
+                this._toggle.destroy();
+            this._toggle = null;
+        });
     }
 });
 
