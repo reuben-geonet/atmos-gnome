@@ -52,7 +52,8 @@ jobs:
         run: |
           python3 -m venv .venv
           . .venv/bin/activate
-          pip install -U pip shexli
+          pip install -U pip
+          pip install shexli==0.2.1 tree-sitter==0.25.2
 
       - name: Run Shexli static analysis
         run: |
